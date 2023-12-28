@@ -21,7 +21,7 @@ impl Vendor {
     pub fn new(path: &str) -> Self {
 
         let file_result = File::open(path);
-        
+
         match file_result {
             Ok(file) => Vendor {
                 reader: Some(Reader::from_reader(file)),
@@ -56,13 +56,13 @@ impl Vendor {
                 });
 
                 for vendor_result in reader.records() {
-            
+
                     let record = vendor_result.unwrap_or_else(|err| {
                         eprintln!("Could not read CSV record ({})", err);
                         process::exit(1);
                     });
                     let potential_oui = record.get(1).unwrap_or("");
-            
+
                     if vendor_oui.eq(potential_oui) {
                         return Some(record.get(2).unwrap_or("(no vendor)").to_string())
                     }
@@ -73,7 +73,7 @@ impl Vendor {
             None => None
         }
     }
-    
+
 }
 
 #[cfg(test)]
@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     fn should_create_vendor_resolver() {
-        
+
         let vendor = Vendor::new("./data/ieee-oui.csv");
 
         assert_eq!(vendor.has_vendor_db(), true);
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn should_handle_unresolved_database() {
-        
+
         let vendor = Vendor::new("./unknown.csv");
 
         assert_eq!(vendor.has_vendor_db(), false);
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn should_find_specific_mac_vendor() {
-        
+
         let mut vendor = Vendor::new("./data/ieee-oui.csv");
         let mac = MacAddr::new(0x40, 0x55, 0x82, 0xc3, 0xe5, 0x5b);
 
@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn should_find_first_mac_vendor() {
-        
+
         let mut vendor = Vendor::new("./data/ieee-oui.csv");
         let mac = MacAddr::new(0x00, 0x22, 0x72, 0xd7, 0xb5, 0x23);
 
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn should_find_last_mac_vendor() {
-        
+
         let mut vendor = Vendor::new("./data/ieee-oui.csv");
         let mac = MacAddr::new(0xcc, 0x9d, 0xa2, 0x14, 0x2e, 0x6f);
 
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn should_handle_unknown_mac_vendor() {
-        
+
         let mut vendor = Vendor::new("./data/ieee-oui.csv");
         let mac = MacAddr::new(0xbb, 0xbb, 0xbb, 0xd2, 0xf5, 0xb6);
 
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn should_pad_correctly_with_zeroes() {
-        
+
         let mut vendor = Vendor::new("./data/ieee-oui.csv");
         let mac = MacAddr::new(0x01, 0x01, 0x01, 0x67, 0xb2, 0x1d);
 

@@ -16,10 +16,10 @@ use pnet::packet::arp::{MutableArpPacket, ArpOperations, ArpHardwareTypes, ArpPa
 use pnet::packet::vlan::{ClassOfService, MutableVlanPacket};
 use rand::prelude::*;
 
-use crate::args::ScanOptions;
+use crate::ScanOptions;
 use crate::vendor::Vendor;
 use crate::utils;
-use crate::args::ScanTiming;
+use crate::ScanTiming;
 
 pub const DATALINK_RCV_TIMEOUT: u64 = 500;
 
@@ -45,6 +45,7 @@ pub struct ScanEstimation {
  * Gives high-level details about the scan response. This may include Ethernet
  * details (packet count, size, ...) and other technical network aspects.
  */
+#[derive(Debug)]
 pub struct ResponseSummary {
     pub packet_count: usize,
     pub arp_count: usize,
@@ -56,6 +57,7 @@ pub struct ResponseSummary {
  * address and a linked MAC address. Hostnames are optional since some hosts
  * does not respond to the resolve call (or the numeric mode may be enabled).
  */
+#[derive(Debug)]
 pub struct TargetDetails {
     pub ipv4: Ipv4Addr,
     pub mac: MacAddr,
@@ -138,7 +140,7 @@ pub fn compute_scan_estimation(host_count: u128, options: &Arc<ScanOptions>) -> 
             let bandwidth_lg: u128 = bandwidth.into();
             let request_phase_ms: u128 = (request_size * 1000) / bandwidth_lg;
             let interval_ms: u128 = (request_phase_ms/retry_count/host_count) - avg_arp_request_ms;
-            
+
             (interval_ms.try_into().unwrap(), bandwidth_lg, request_phase_ms)
 
         },
@@ -151,7 +153,7 @@ pub fn compute_scan_estimation(host_count: u128, options: &Arc<ScanOptions>) -> 
             (interval, bandwidth, request_phase_ms)
         }
     };
-    
+
     let duration_ms = request_phase_ms + timeout + avg_resolve_ms;
 
     ScanEstimation {
@@ -398,7 +400,7 @@ pub fn receive_arp_responses(rx: &mut Box<dyn DataLinkReceiver>, options: Arc<Sc
             }
         };
         packet_count += 1;
-        
+
         let ethernet_packet = match EthernetPacket::new(arp_buffer) {
             Some(packet) => packet,
             None => continue
@@ -420,7 +422,7 @@ pub fn receive_arp_responses(rx: &mut Box<dyn DataLinkReceiver>, options: Arc<Sc
 
             let sender_ipv4 = arp.get_sender_proto_addr();
             let sender_mac = arp.get_sender_hw_addr();
-    
+
             discover_map.insert(sender_ipv4, TargetDetails {
                 ipv4: sender_ipv4,
                 mac: sender_mac,
@@ -469,7 +471,7 @@ fn find_hostname(ipv4: Ipv4Addr) -> Option<String> {
             // The 'lookup_addr' function returns an IP address if no hostname
             // was found. If this is the case, we prefer switching to None.
             if hostname.parse::<IpAddr>().is_ok() {
-                return None; 
+                return None;
             }
 
             Some(hostname)
