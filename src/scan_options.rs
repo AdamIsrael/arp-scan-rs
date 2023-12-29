@@ -115,7 +115,6 @@ impl ScanOptions {
             }
         };
 
-        // TODO: re-implement compute_scan_timing
         let scan_timing: ScanTiming = ScanOptions::compute_scan_timing(bandwidth, interval, &profile);
 
         let randomize_targets = random.unwrap_or(true) || matches!(profile, ProfileType::Stealth | ProfileType::Chaos);
@@ -175,25 +174,6 @@ impl ScanOptions {
                 _ => ScanTiming::Interval(REQUEST_MS_INTERVAL)
             }
         }
-
-        // match (matches.get_one::<String>("bandwidth"), matches.get_one::<String>("interval")) {
-        //     (Some(bandwidth_text), None) => {
-        //         let bits_second: u64 = bandwidth_text.parse().unwrap_or_else(|err| {
-        //             eprintln!("Expected positive number, {}", err);
-        //             process::exit(1);
-        //         });
-        //         ScanTiming::Bandwidth(bits_second)
-        //     },
-        //     (None, Some(interval_text)) => parse_to_milliseconds(interval_text).map(ScanTiming::Interval).unwrap_or_else(|err| {
-        //         eprintln!("Expected correct interval, {}", err);
-        //         process::exit(1);
-        //     }),
-        //     _ => match profile {
-        //         ProfileType::Stealth => ScanTiming::Interval(REQUEST_MS_INTERVAL * 2),
-        //         ProfileType::Fast => ScanTiming::Interval(0),
-        //         _ => ScanTiming::Interval(REQUEST_MS_INTERVAL)
-        //     }
-        // }
     }
 
     /**
@@ -225,7 +205,6 @@ impl ScanOptions {
     }
 
     fn list_required_networks(file_value: Option<&String>, network_value: Option<&String>) -> Result<Option<Vec<String>>, String> {
-
         let network_options = (file_value, network_value);
         match network_options {
             (Some(file_path), None) => {
