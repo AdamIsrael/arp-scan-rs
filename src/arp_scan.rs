@@ -73,17 +73,15 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
     let has_reached_timeout = Arc::new(AtomicBool::new(false));
     let cloned_reached_timeout = Arc::clone(&has_reached_timeout);
 
-    ctrlc::set_handler(move || {
+    match ctrlc::set_handler(move || {
         eprintln!("[warn] Receiving halt signal, ending scan with partial results");
         cloned_reached_timeout.store(true, Ordering::Relaxed);
-    })
-    .unwrap_or_else(|err| {
-        // TODO: Fix this return
-        return;
-        // return Err("Could not set CTRL+C handler".to_string());
-        // eprintln!("Could not set CTRL+C handler ({})", err);
-        // process::exit(1);
-    });
+    }) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(Error::new(ErrorKind::Other, format!("Could not set CTRL+C handler.")));
+        }
+    }
 
     let source_ip = network::find_source_ip(selected_interface, scan_options.source_ipv4);
 

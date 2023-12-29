@@ -1,6 +1,6 @@
 extern crate arp_scan;
 
-use std::io::{Error, ErrorKind};
+// use std::io::{Error, ErrorKind};
 use std::net::Ipv4Addr;
 use std::process;
 use std::sync::Arc;
@@ -16,8 +16,10 @@ use serde::Serialize;
 use arp_scan::{
     compute_network_configuration, compute_network_size, compute_scan_estimation, ProfileType,
     ResponseSummary, ScanOptions, ScanTiming, TargetDetails, HOST_RETRY_DEFAULT,
+    print_ascii_packet, show_interfaces,
     TIMEOUT_MS_DEFAULT, TIMEOUT_MS_FAST,
 };
+// use arp_scan::utils;
 
 const CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -471,7 +473,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
         None => None,
     };
 
-    let packet_help = matches.get_flag("packet_help");
+    let packet_help: bool = matches.get_flag("packet_help");
 
     Arc::new(ScanOptions {
         profile,
@@ -740,6 +742,39 @@ pub fn format_milliseconds(milliseconds: u128) -> String {
 fn main() {
     let matches = build_args().get_matches();
     let scan_options = parse_clap_args(&matches);
+
+    // Find interfaces & list them if requested
+    // ----------------------------------------
+    // All network interfaces are retrieved and will be listed if the '--list'
+    // flag has been given in the request. Note that this can be done without
+    // using a root account (this will be verified later).
+
+    let interfaces = pnet_datalink::interfaces();
+
+    if matches.get_flag("list") {
+        show_interfaces(&interfaces);
+        process::exit(0);
+    }
+
+    if matches.get_flag("packet_help") {
+        print_ascii_packet();
+        process::exit(0);
+    }
+    // if scan_options.request_protocol_print() {
+    //     utils::print_ascii_packet();
+    //     process::exit(0);
+    // }
+
+    // if !utils::is_root_user() {
+    //     eprintln!("Should run this binary as root or use --help for options");
+    //     process::exit(1);
+    // }
+
+    // All network interfaces are retrieved and will be listed if the '--list'
+    // flag has been given in the request. Note that this can be done without
+    // using a root account (this will be verified later).
+
+    let interfaces = pnet_datalink::interfaces();
 
     let output = match matches.get_one::<String>("output") {
         Some(output_request) => match output_request.as_ref() {
