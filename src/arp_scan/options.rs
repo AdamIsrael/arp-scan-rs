@@ -64,8 +64,8 @@ impl ScanOptions {
     pub fn new(
         profile: ProfileType,
         interface_name: Option<String>,
-        file_option: Option<String>,
-        network_option: Option<String>,
+        // file_option: Option<String>,
+        // network_option: Option<String>,
         network_range: Option<Vec<IpNetwork>>,
         timeout: Option<u64>,
         hostname_numeric: Option<bool>,

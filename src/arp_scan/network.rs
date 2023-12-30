@@ -16,10 +16,11 @@ use pnet::packet::arp::{MutableArpPacket, ArpOperations, ArpHardwareTypes, ArpPa
 use pnet::packet::vlan::{ClassOfService, MutableVlanPacket};
 use rand::prelude::*;
 
-use crate::ScanOptions;
-use crate::vendor::Vendor;
-use crate::utils;
-use crate::ScanTiming;
+use super::options::ScanOptions;
+
+use super::vendor::Vendor;
+use super::options::ScanTiming;
+use super::utils;
 
 pub const DATALINK_RCV_TIMEOUT: u64 = 500;
 

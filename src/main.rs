@@ -1,11 +1,12 @@
-extern crate arp_scan;
+// extern crate arp;
+// extern crate arp_scan;
 
 // use std::io::{Error, ErrorKind};
 use std::net::Ipv4Addr;
 use std::process;
 use std::sync::Arc;
 
-use ansi_term::Color::{Green, Red};
+use ansi_term::Color::Red;
 use clap::builder::PossibleValue;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use pnet::packet::arp::{ArpHardwareType, ArpOperation};
@@ -13,12 +14,18 @@ use pnet::packet::ethernet::EtherType;
 use pnet_datalink::MacAddr;
 use serde::Serialize;
 
-use arp_scan::{
-    compute_network_configuration, compute_network_size, compute_scan_estimation, ProfileType,
-    ResponseSummary, ScanOptions, ScanTiming, TargetDetails, HOST_RETRY_DEFAULT,
-    print_ascii_packet, show_interfaces,
-    TIMEOUT_MS_DEFAULT, TIMEOUT_MS_FAST,
-};
+pub mod arp_scan;
+use arp_scan::{network::*, options::*, scan, utils};
+
+mod time;
+mod print;
+
+// use arp_scan::{
+//     compute_network_configuration, compute_network_size, compute_scan_estimation, ProfileType,
+//     ResponseSummary, ScanOptions, ScanTiming, TargetDetails, HOST_RETRY_DEFAULT,
+//     print_ascii_packet, show_interfaces,
+//     TIMEOUT_MS_DEFAULT, TIMEOUT_MS_FAST,
+// };
 // use arp_scan::utils;
 
 const CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -47,50 +54,6 @@ enum OutputFormat {
     Json,
     Yaml,
     Csv,
-}
-/* Parse a given time string into milliseconds. This can be used to convert a
- * string such as '20ms', '10s' or '1h' into adequate milliseconds. Without
- * suffix, the default behavior is to parse into milliseconds.
- */
-fn parse_to_milliseconds(time_arg: &str) -> Result<u64, &str> {
-    let len = time_arg.len();
-
-    if time_arg.ends_with("ms") {
-        let milliseconds_text = &time_arg[0..len - 2];
-        return match milliseconds_text.parse::<u64>() {
-            Ok(ms_value) => Ok(ms_value),
-            Err(_) => Err("invalid milliseconds"),
-        };
-    }
-
-    if time_arg.ends_with('s') {
-        let seconds_text = &time_arg[0..len - 1];
-        return match seconds_text.parse::<u64>().map(|value| value * 1000) {
-            Ok(ms_value) => Ok(ms_value),
-            Err(_) => Err("invalid seconds"),
-        };
-    }
-
-    if time_arg.ends_with('m') {
-        let seconds_text = &time_arg[0..len - 1];
-        return match seconds_text.parse::<u64>().map(|value| value * 1000 * 60) {
-            Ok(ms_value) => Ok(ms_value),
-            Err(_) => Err("invalid minutes"),
-        };
-    }
-
-    if time_arg.ends_with('h') {
-        let hour_text = &time_arg[0..len - 1];
-        return match hour_text.parse::<u64>().map(|value| value * 1000 * 60 * 60) {
-            Ok(ms_value) => Ok(ms_value),
-            Err(_) => Err("invalid hours"),
-        };
-    }
-
-    match time_arg.parse::<u64>() {
-        Ok(ms_value) => Ok(ms_value),
-        Err(_) => Err("invalid milliseconds"),
-    }
 }
 
 /**
@@ -301,7 +264,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
         });
 
     let timeout_ms: u64 = match matches.get_one::<String>("timeout") {
-        Some(timeout_text) => parse_to_milliseconds(timeout_text).unwrap_or_else(|err| {
+        Some(timeout_text) => time::parse_to_milliseconds(timeout_text).unwrap_or_else(|err| {
             eprintln!("Expected correct timeout, {}", err);
             process::exit(1);
         }),
@@ -396,20 +359,6 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
 
     let scan_timing: ScanTiming = ScanOptions::compute_scan_timing(bandwidth, interval, &profile);
 
-    let output = match matches.get_one::<String>("output") {
-        Some(output_request) => match output_request.as_ref() {
-            "json" => OutputFormat::Json,
-            "yaml" => OutputFormat::Yaml,
-            "plain" | "text" => OutputFormat::Plain,
-            "csv" => OutputFormat::Csv,
-            _ => {
-                eprintln!("Expected correct output format (json/yaml/plain)");
-                process::exit(1);
-            }
-        },
-        None => OutputFormat::Plain,
-    };
-
     let randomize_targets =
         matches.get_flag("random") || matches!(profile, ProfileType::Stealth | ProfileType::Chaos);
 
@@ -472,8 +421,6 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
         },
         None => None,
     };
-
-    let packet_help: bool = matches.get_flag("packet_help");
 
     Arc::new(ScanOptions {
         profile,
@@ -716,29 +663,6 @@ pub fn export_to_csv(
     })
 }
 
-/**
- * Format milliseconds to a human-readable string. This will of course give an
- * approximation, but will be readable.
- */
-pub fn format_milliseconds(milliseconds: u128) -> String {
-    if milliseconds < 1000 {
-        return format!("{}ms", milliseconds);
-    }
-
-    if milliseconds < 1000 * 60 {
-        let seconds = milliseconds / 1000;
-        return format!("{}s", seconds);
-    }
-
-    if milliseconds < 1000 * 60 * 60 {
-        let minutes = milliseconds / 1000 / 60;
-        return format!("{}m", minutes);
-    }
-
-    let hours: u128 = milliseconds / 1000 / 60 / 60;
-    format!("{}h", hours)
-}
-
 fn main() {
     let matches = build_args().get_matches();
     let scan_options = parse_clap_args(&matches);
@@ -752,29 +676,20 @@ fn main() {
     let interfaces = pnet_datalink::interfaces();
 
     if matches.get_flag("list") {
-        show_interfaces(&interfaces);
+        print::show_interfaces(&interfaces);
         process::exit(0);
     }
 
     if matches.get_flag("packet_help") {
-        print_ascii_packet();
+        print::print_ascii_packet();
         process::exit(0);
     }
-    // if scan_options.request_protocol_print() {
-    //     utils::print_ascii_packet();
-    //     process::exit(0);
-    // }
 
-    // if !utils::is_root_user() {
-    //     eprintln!("Should run this binary as root or use --help for options");
-    //     process::exit(1);
-    // }
-
-    // All network interfaces are retrieved and will be listed if the '--list'
-    // flag has been given in the request. Note that this can be done without
-    // using a root account (this will be verified later).
-
-    let interfaces = pnet_datalink::interfaces();
+    // TODO: Is this actually needed? I don't need root to run it on MacOS.
+    if !utils::is_root_user() {
+        eprintln!("Should run this binary as root or use --help for options");
+        process::exit(1);
+    }
 
     let output = match matches.get_one::<String>("output") {
         Some(output_request) => match output_request.as_ref() {
@@ -791,16 +706,14 @@ fn main() {
     };
 
     if matches!(output, OutputFormat::Plain) {
-        let interfaces = pnet_datalink::interfaces();
-
         let (_, ip_networks) = compute_network_configuration(&interfaces, &scan_options);
 
-        match compute_network_size(&ip_networks) {
+        match utils::compute_network_size(&ip_networks) {
             Ok(network_size) => {
                 let estimations = compute_scan_estimation(network_size, &scan_options);
                 let interval_ms = estimations.interval_ms;
 
-                let formatted_ms = format_milliseconds(estimations.duration_ms);
+                let formatted_ms = time::format_milliseconds(estimations.duration_ms);
                 println!(
                     "Estimated scan time {} ({} bytes, {} bytes/s)",
                     formatted_ms, estimations.request_size, estimations.bandwidth
@@ -817,24 +730,11 @@ fn main() {
         }
     }
 
-    match arp_scan::arp_scan(&scan_options) {
+    match scan::arp_scan(&scan_options) {
         Ok(res) => {
             let response_summary = res.response_summary;
             let target_details = res.target_details;
 
-            let output = match matches.get_one::<String>("output") {
-                Some(output_request) => match output_request.as_ref() {
-                    "json" => OutputFormat::Json,
-                    "yaml" => OutputFormat::Yaml,
-                    "plain" | "text" => OutputFormat::Plain,
-                    "csv" => OutputFormat::Csv,
-                    _ => {
-                        eprintln!("Expected correct output format (json/yaml/plain)");
-                        process::exit(1);
-                    }
-                },
-                None => OutputFormat::Plain,
-            };
 
             match output {
                 OutputFormat::Plain => {
