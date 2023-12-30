@@ -17,8 +17,8 @@ use serde::Serialize;
 pub mod arp_scan;
 use arp_scan::{network::*, options::*, scan, utils};
 
-mod time;
 mod print;
+mod time;
 
 // use arp_scan::{
 //     compute_network_configuration, compute_network_size, compute_scan_estimation, ProfileType,
@@ -734,7 +734,6 @@ fn main() {
         Ok(res) => {
             let response_summary = res.response_summary;
             let target_details = res.target_details;
-
 
             match output {
                 OutputFormat::Plain => {

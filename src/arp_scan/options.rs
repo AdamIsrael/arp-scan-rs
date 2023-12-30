@@ -5,9 +5,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use ipnetwork::IpNetwork;
-use pnet_datalink::MacAddr;
 use pnet::packet::arp::{ArpHardwareType, ArpOperation};
 use pnet::packet::ethernet::EtherType;
+use pnet_datalink::MacAddr;
 
 pub const TIMEOUT_MS_FAST: u64 = 800;
 pub const TIMEOUT_MS_DEFAULT: u64 = 2000;
@@ -20,13 +20,13 @@ pub enum ProfileType {
     Default,
     Fast,
     Stealth,
-    Chaos
+    Chaos,
 }
 
 #[derive(Debug)]
 pub enum ScanTiming {
     Interval(u64),
-    Bandwidth(u64)
+    Bandwidth(u64),
 }
 
 #[derive(Debug)]
@@ -84,7 +84,6 @@ impl ScanOptions {
         bandwidth: Option<u64>,
         interval: Option<u64>,
     ) -> Result<Arc<Self>, String> {
-
         let mut timeout_ms = timeout.unwrap_or(TIMEOUT_MS_DEFAULT);
         if profile == ProfileType::Fast {
             timeout_ms = TIMEOUT_MS_FAST;
@@ -95,33 +94,32 @@ impl ScanOptions {
         let resolve_hostname = !hostname_numeric.unwrap_or(true) && profile != ProfileType::Stealth;
 
         let source_ipv4: Option<Ipv4Addr> = match source_ip {
-            Some(source_ip) => {
-
-                match source_ip.parse::<Ipv4Addr>() {
-                    Ok(parsed_ipv4) => Some(parsed_ipv4),
-                    Err(e) => {
-                        return Err(e.to_string());
-                    }
+            Some(source_ip) => match source_ip.parse::<Ipv4Addr>() {
+                Ok(parsed_ipv4) => Some(parsed_ipv4),
+                Err(e) => {
+                    return Err(e.to_string());
                 }
             },
-            None => None
+            None => None,
         };
 
         let retry_count = match retries {
             Some(retry_count) => retry_count,
             None => match profile {
                 ProfileType::Chaos => HOST_RETRY_DEFAULT * 2,
-                _ => HOST_RETRY_DEFAULT
-            }
+                _ => HOST_RETRY_DEFAULT,
+            },
         };
 
-        let scan_timing: ScanTiming = ScanOptions::compute_scan_timing(bandwidth, interval, &profile);
+        let scan_timing: ScanTiming =
+            ScanOptions::compute_scan_timing(bandwidth, interval, &profile);
 
-        let randomize_targets = random.unwrap_or(true) || matches!(profile, ProfileType::Stealth | ProfileType::Chaos);
+        let randomize_targets =
+            random.unwrap_or(true) || matches!(profile, ProfileType::Stealth | ProfileType::Chaos);
 
         let oui_file: String = match oui {
             Some(file) => file.to_string(),
-            None => "/usr/share/arp-scan/ieee-oui.csv".to_string()
+            None => "/usr/share/arp-scan/ieee-oui.csv".to_string(),
         };
 
         // let packet_help = matches.get_flag("packet_help");
@@ -161,18 +159,19 @@ impl ScanOptions {
      * arguments. The scan timing constraints will be either expressed in bandwidth
      * (bits per second) or interval between ARP requests (in milliseconds).
      */
-    pub fn compute_scan_timing(bandwidth: Option<u64>, interval: Option<u64>, profile: &ProfileType) -> ScanTiming {
-
+    pub fn compute_scan_timing(
+        bandwidth: Option<u64>,
+        interval: Option<u64>,
+        profile: &ProfileType,
+    ) -> ScanTiming {
         match (bandwidth, interval) {
-            (Some(bandwidth), None) => {
-                ScanTiming::Bandwidth(bandwidth)
-            }
+            (Some(bandwidth), None) => ScanTiming::Bandwidth(bandwidth),
             (None, Some(interval)) => ScanTiming::Interval(interval),
             _ => match profile {
                 ProfileType::Stealth => ScanTiming::Interval(REQUEST_MS_INTERVAL * 2),
                 ProfileType::Fast => ScanTiming::Interval(0),
-                _ => ScanTiming::Interval(REQUEST_MS_INTERVAL)
-            }
+                _ => ScanTiming::Interval(REQUEST_MS_INTERVAL),
+            },
         }
     }
 
@@ -181,46 +180,45 @@ impl ScanOptions {
      * arguments or files. This method will fail of a failure has been detected
      * (either on the IO level or the network syntax parsing)
      */
-    pub fn compute_networks(file_value: Option<&String>, network_value: Option<&String>) -> Result<Option<Vec<IpNetwork>>, String> {
-
-        let required_networks: Option<Vec<String>> = ScanOptions::list_required_networks(file_value, network_value)?;
+    pub fn compute_networks(
+        file_value: Option<&String>,
+        network_value: Option<&String>,
+    ) -> Result<Option<Vec<IpNetwork>>, String> {
+        let required_networks: Option<Vec<String>> =
+            ScanOptions::list_required_networks(file_value, network_value)?;
         if required_networks.is_none() {
             return Ok(None);
         }
 
         let mut networks: Vec<IpNetwork> = vec![];
         for network_text in required_networks.unwrap() {
-
             match IpNetwork::from_str(&network_text) {
                 Ok(parsed_network) => {
                     networks.push(parsed_network);
                     Ok(())
-                },
-                Err(err) => {
-                    Err(format!("Expected valid IPv4 network range ({})", err))
                 }
+                Err(err) => Err(format!("Expected valid IPv4 network range ({})", err)),
             }?;
         }
         Ok(Some(networks))
     }
 
-    fn list_required_networks(file_value: Option<&String>, network_value: Option<&String>) -> Result<Option<Vec<String>>, String> {
+    fn list_required_networks(
+        file_value: Option<&String>,
+        network_value: Option<&String>,
+    ) -> Result<Option<Vec<String>>, String> {
         let network_options = (file_value, network_value);
         match network_options {
             (Some(file_path), None) => {
-
                 let path = Path::new(file_path);
-                fs::read_to_string(path).map(|content| {
-                    Some(content.lines().map(|line| line.to_string()).collect())
-                }).map_err(|err| {
-                    format!("Could not open file {} - {}", file_path, err)
-                })
-
-            },
-            (None, Some(raw_ranges)) => {
-                Ok(Some(raw_ranges.split(',').map(|line| line.to_string()).collect()))
-            },
-            _ => Ok(None)
+                fs::read_to_string(path)
+                    .map(|content| Some(content.lines().map(|line| line.to_string()).collect()))
+                    .map_err(|err| format!("Could not open file {} - {}", file_path, err))
+            }
+            (None, Some(raw_ranges)) => Ok(Some(
+                raw_ranges.split(',').map(|line| line.to_string()).collect(),
+            )),
+            _ => Ok(None),
         }
     }
 }

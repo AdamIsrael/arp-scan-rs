@@ -1,6 +1,5 @@
 use crate::arp_scan::utils::select_default_interface;
 
-
 use ansi_term::Color::{Green, Red};
 use pnet_datalink::NetworkInterface;
 
@@ -10,27 +9,28 @@ use pnet_datalink::NetworkInterface;
  * to pick the right network interface for scans.
  */
 pub fn show_interfaces(interfaces: &[NetworkInterface]) {
-
     let mut interface_count = 0;
     let mut ready_count = 0;
 
     println!();
     for interface in interfaces.iter() {
-
         let up_text = match interface.is_up() {
             true => format!("{} UP", Green.paint("✔")),
-            false => format!("{} DOWN", Red.paint("✖"))
+            false => format!("{} DOWN", Red.paint("✖")),
         };
         let mac_text = match interface.mac {
             Some(mac_address) => format!("{}", mac_address),
-            None => "No MAC address".to_string()
+            None => "No MAC address".to_string(),
         };
         let first_ip = match interface.ips.get(0) {
             Some(ip_address) => format!("{}", ip_address),
-            None => "".to_string()
+            None => "".to_string(),
         };
 
-        println!("{: <20} {: <18} {: <20} {}", interface.name, up_text, mac_text, first_ip);
+        println!(
+            "{: <20} {: <18} {: <20} {}",
+            interface.name, up_text, mac_text, first_ip
+        );
 
         interface_count += 1;
         if interface.is_up() && !interface.is_loopback() && !interface.ips.is_empty() {
@@ -39,15 +39,20 @@ pub fn show_interfaces(interfaces: &[NetworkInterface]) {
     }
 
     println!();
-    println!("Found {} network interfaces, {} seems ready for ARP scans", interface_count, ready_count);
+    println!(
+        "Found {} network interfaces, {} seems ready for ARP scans",
+        interface_count, ready_count
+    );
     if let Some(default_interface) = select_default_interface(interfaces) {
-        println!("Default network interface will be {}", default_interface.name);
+        println!(
+            "Default network interface will be {}",
+            default_interface.name
+        );
     }
     println!();
 }
 
 pub fn print_ascii_packet() {
-
     println!();
     println!(" 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 ");
     println!("+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+");

@@ -1,4 +1,3 @@
-
 use std::env;
 
 use ipnetwork::{IpNetwork, NetworkSize};
@@ -17,7 +16,6 @@ pub fn is_root_user() -> bool {
  * supported by this function.
  */
 pub fn compute_network_size(ip_networks: &[&IpNetwork]) -> Result<u128, String> {
-
     let size = ip_networks.iter().fold(0u128, |total_size, ip_network| {
         let network_size: u128 = match ip_network.size() {
             NetworkSize::V4(ipv4_network_size) => ipv4_network_size.into(),
@@ -30,8 +28,7 @@ pub fn compute_network_size(ip_networks: &[&IpNetwork]) -> Result<u128, String> 
     });
     if size > 0 {
         Ok(size)
-    }
-    else {
+    } else {
         Err("IPv6 networks are not supported by the ARP protocol.".to_string())
     }
 }
@@ -41,9 +38,7 @@ pub fn compute_network_size(ip_networks: &[&IpNetwork]) -> Result<u128, String> 
  * priority and some interface technical details.
  */
 pub fn select_default_interface(interfaces: &[NetworkInterface]) -> Option<NetworkInterface> {
-
     let default_interface = interfaces.iter().find(|interface| {
-
         if interface.mac.is_none() {
             return false;
         }

@@ -9,7 +9,7 @@ use std::time::Duration;
 // use crate::{network, utils, ResponseSummary, TargetDetails, Vendor};
 
 use super::options::ScanOptions;
-use super::{network, Vendor, utils};
+use super::{network, utils, Vendor};
 
 #[derive(Debug)]
 pub struct ScanResults {
@@ -82,7 +82,10 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
     }) {
         Ok(_) => {}
         Err(_) => {
-            return Err(Error::new(ErrorKind::Other, format!("Could not set CTRL+C handler.")));
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!("Could not set CTRL+C handler."),
+            ));
         }
     }
 
