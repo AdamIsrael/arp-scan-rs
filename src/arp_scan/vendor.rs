@@ -9,6 +9,7 @@ use pnet_datalink::MacAddr;
 // dedicated MAC address range that is registered by the IEEE and maintained in
 // the OUI database. An OUI is a 24-bit globally unique assigned number
 // referenced by various standards.
+#[derive(Debug)]
 pub struct Vendor {
     reader: Option<Reader<File>>,
 }

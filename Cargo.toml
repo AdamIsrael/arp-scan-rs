@@ -13,6 +13,10 @@ categories = ["command-line-utilities"]
 exclude = ["/.semaphore", "/data", "/release.sh", ".*"]
 rust-version = "1.71"
 
+[lib]
+name = "arp_scan"
+path = "src/arp_scan/lib.rs"
+
 [dependencies]
 
 # CLI & utilities

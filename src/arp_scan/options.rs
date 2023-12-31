@@ -64,8 +64,6 @@ impl ScanOptions {
     pub fn new(
         profile: ProfileType,
         interface_name: Option<String>,
-        // file_option: Option<String>,
-        // network_option: Option<String>,
         network_range: Option<Vec<IpNetwork>>,
         timeout: Option<u64>,
         hostname_numeric: Option<bool>,
@@ -151,7 +149,8 @@ impl ScanOptions {
     }
 
     pub fn has_vlan(&self) -> bool {
-        matches!(&self.vlan_id, Some(_))
+        self.vlan_id.is_some()
+        // matches!(&self.vlan_id, Some(_))
     }
 
     /**

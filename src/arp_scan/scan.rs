@@ -5,9 +5,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-// use crate::options::ScanOptions;
-// use crate::{network, utils, ResponseSummary, TargetDetails, Vendor};
-
 use super::options::ScanOptions;
 use super::{network, utils, Vendor};
 
@@ -32,7 +29,7 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
     let interfaces = pnet_datalink::interfaces();
 
     let (selected_interface, ip_networks) =
-        network::compute_network_configuration(&interfaces, &scan_options);
+        network::compute_network_configuration(&interfaces, scan_options);
 
     let (mut tx, mut rx) = match pnet_datalink::channel(selected_interface, channel_config) {
         Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
@@ -58,7 +55,7 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
 
     let mut vendor_list = Vendor::new(&scan_options.oui_file);
 
-    let cloned_options = Arc::clone(&scan_options);
+    let cloned_options = Arc::clone(scan_options);
     let arp_responses = thread::spawn(move || {
         network::receive_arp_responses(&mut rx, cloned_options, cloned_timed_out, &mut vendor_list)
     });
@@ -70,7 +67,7 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
         }
     };
 
-    let estimations = network::compute_scan_estimation(network_size, &scan_options);
+    let estimations = network::compute_scan_estimation(network_size, scan_options);
     let interval_ms = estimations.interval_ms;
 
     let has_reached_timeout = Arc::new(AtomicBool::new(false));
@@ -84,7 +81,7 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
         Err(_) => {
             return Err(Error::new(
                 ErrorKind::Other,
-                format!("Could not set CTRL+C handler."),
+                "Could not set CTRL+C handler.",
             ));
         }
     }
@@ -112,7 +109,7 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
                     selected_interface,
                     source_ip,
                     ipv4_address,
-                    Arc::clone(&scan_options),
+                    Arc::clone(scan_options),
                 );
                 thread::sleep(Duration::from_millis(interval_ms));
             }
@@ -131,13 +128,13 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
 
     match arp_responses.join() {
         Ok(r) => {
-            return Ok(ScanResults {
+            Ok(ScanResults {
                 response_summary: r.0,
                 target_details: r.1,
-            });
+            })
         }
         Err(_) => {
-            return Err(Error::new(ErrorKind::Other, ""));
+            Err(Error::new(ErrorKind::Other, ""))
         }
     }
 

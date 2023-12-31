@@ -1,4 +1,4 @@
-use crate::arp_scan::utils::select_default_interface;
+use arp_scan::select_default_interface;
 
 use ansi_term::Color::{Green, Red};
 use pnet_datalink::NetworkInterface;
@@ -22,7 +22,7 @@ pub fn show_interfaces(interfaces: &[NetworkInterface]) {
             Some(mac_address) => format!("{}", mac_address),
             None => "No MAC address".to_string(),
         };
-        let first_ip = match interface.ips.get(0) {
+        let first_ip = match interface.ips.first() {
             Some(ip_address) => format!("{}", ip_address),
             None => "".to_string(),
         };

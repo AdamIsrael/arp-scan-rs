@@ -1,7 +1,3 @@
-// extern crate arp;
-// extern crate arp_scan;
-
-// use std::io::{Error, ErrorKind};
 use std::net::Ipv4Addr;
 use std::process;
 use std::sync::Arc;
@@ -14,19 +10,10 @@ use pnet::packet::ethernet::EtherType;
 use pnet_datalink::MacAddr;
 use serde::Serialize;
 
-pub mod arp_scan;
-use arp_scan::{network::*, options::*, scan, utils};
+// use arp_scan;
 
 mod print;
 mod time;
-
-// use arp_scan::{
-//     compute_network_configuration, compute_network_size, compute_scan_estimation, ProfileType,
-//     ResponseSummary, ScanOptions, ScanTiming, TargetDetails, HOST_RETRY_DEFAULT,
-//     print_ascii_packet, show_interfaces,
-//     TIMEOUT_MS_DEFAULT, TIMEOUT_MS_FAST,
-// };
-// use arp_scan::utils;
 
 const CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -236,19 +223,19 @@ pub fn build_args() -> Command {
         .after_help(EXAMPLES_HELP)
 }
 
-pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
+pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
     let profile = match matches.get_one::<String>("profile") {
         Some(output_request) => match output_request.as_ref() {
-            "default" | "d" => ProfileType::Default,
-            "fast" | "f" => ProfileType::Fast,
-            "stealth" | "s" => ProfileType::Stealth,
-            "chaos" | "c" => ProfileType::Chaos,
+            "default" | "d" => arp_scan::ProfileType::Default,
+            "fast" | "f" => arp_scan::ProfileType::Fast,
+            "stealth" | "s" => arp_scan::ProfileType::Stealth,
+            "chaos" | "c" => arp_scan::ProfileType::Chaos,
             _ => {
                 eprintln!("Expected correct profile name (default/fast/stealth/chaos)");
                 process::exit(1);
             }
         },
-        None => ProfileType::Default,
+        None => arp_scan::ProfileType::Default,
     };
 
     let interface_name = matches.get_one::<String>("interface").cloned();
@@ -256,8 +243,8 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
     let file_option = matches.get_one::<String>("file");
     let network_option = matches.get_one::<String>("network");
 
-    let network_range =
-        ScanOptions::compute_networks(file_option, network_option).unwrap_or_else(|err| {
+    let network_range = arp_scan::ScanOptions::compute_networks(file_option, network_option)
+        .unwrap_or_else(|err| {
             eprintln!("Could not compute requested network range to scan");
             eprintln!("{}", err);
             process::exit(1);
@@ -269,13 +256,14 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
             process::exit(1);
         }),
         None => match profile {
-            ProfileType::Fast => TIMEOUT_MS_FAST,
-            _ => TIMEOUT_MS_DEFAULT,
+            arp_scan::ProfileType::Fast => arp_scan::TIMEOUT_MS_FAST,
+            _ => arp_scan::TIMEOUT_MS_DEFAULT,
         },
     };
 
     // Hostnames will not be resolved in numeric mode or stealth profile
-    let resolve_hostname = !matches.get_flag("numeric") && !matches!(profile, ProfileType::Stealth);
+    let resolve_hostname =
+        !matches.get_flag("numeric") && !matches!(profile, arp_scan::ProfileType::Stealth);
 
     let source_ipv4: Option<Ipv4Addr> = match matches.get_one::<String>("source_ip") {
         Some(source_ip) => match source_ip.parse::<Ipv4Addr>() {
@@ -330,8 +318,8 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
             }
         },
         None => match profile {
-            ProfileType::Chaos => HOST_RETRY_DEFAULT * 2,
-            _ => HOST_RETRY_DEFAULT,
+            arp_scan::ProfileType::Chaos => arp_scan::HOST_RETRY_DEFAULT * 2,
+            _ => arp_scan::HOST_RETRY_DEFAULT,
         },
     };
 
@@ -357,10 +345,14 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
         None => None,
     };
 
-    let scan_timing: ScanTiming = ScanOptions::compute_scan_timing(bandwidth, interval, &profile);
+    let scan_timing: arp_scan::ScanTiming =
+        arp_scan::ScanOptions::compute_scan_timing(bandwidth, interval, &profile);
 
-    let randomize_targets =
-        matches.get_flag("random") || matches!(profile, ProfileType::Stealth | ProfileType::Chaos);
+    let randomize_targets = matches.get_flag("random")
+        || matches!(
+            profile,
+            arp_scan::ProfileType::Stealth | arp_scan::ProfileType::Chaos
+        );
 
     let oui_file: String = match matches.get_one::<String>("oui-file") {
         Some(file) => file.to_string(),
@@ -422,7 +414,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
         None => None,
     };
 
-    Arc::new(ScanOptions {
+    Arc::new(arp_scan::ScanOptions {
         profile,
         interface_name,
         network_range,
@@ -453,9 +445,9 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<ScanOptions> {
  * contains all items that will be displayed.
  */
 pub fn display_scan_results(
-    response_summary: ResponseSummary,
-    mut target_details: Vec<TargetDetails>,
-    options: &ScanOptions,
+    response_summary: arp_scan::ResponseSummary,
+    mut target_details: Vec<arp_scan::TargetDetails>,
+    options: &arp_scan::ScanOptions,
 ) {
     target_details.sort_by_key(|item| item.ipv4);
 
@@ -559,8 +551,8 @@ struct SerializableGlobalResult {
  * that can be serialized for export (JSON, YAML, CSV, ...)
  */
 fn get_serializable_result(
-    response_summary: ResponseSummary,
-    target_details: Vec<TargetDetails>,
+    response_summary: arp_scan::ResponseSummary,
+    target_details: Vec<arp_scan::TargetDetails>,
 ) -> SerializableGlobalResult {
     let exportable_results: Vec<SerializableResultItem> = target_details
         .into_iter()
@@ -597,8 +589,8 @@ fn get_serializable_result(
  * and ARP results from the local network.
  */
 pub fn export_to_json(
-    response_summary: ResponseSummary,
-    mut target_details: Vec<TargetDetails>,
+    response_summary: arp_scan::ResponseSummary,
+    mut target_details: Vec<arp_scan::TargetDetails>,
 ) -> String {
     target_details.sort_by_key(|item| item.ipv4);
 
@@ -615,8 +607,8 @@ pub fn export_to_json(
  * and ARP results from the local network.
  */
 pub fn export_to_yaml(
-    response_summary: ResponseSummary,
-    mut target_details: Vec<TargetDetails>,
+    response_summary: arp_scan::ResponseSummary,
+    mut target_details: Vec<arp_scan::TargetDetails>,
 ) -> String {
     target_details.sort_by_key(|item| item.ipv4);
 
@@ -633,8 +625,8 @@ pub fn export_to_yaml(
  * and ARP results from the local network.
  */
 pub fn export_to_csv(
-    response_summary: ResponseSummary,
-    mut target_details: Vec<TargetDetails>,
+    response_summary: arp_scan::ResponseSummary,
+    mut target_details: Vec<arp_scan::TargetDetails>,
 ) -> String {
     target_details.sort_by_key(|item| item.ipv4);
 
@@ -686,7 +678,7 @@ fn main() {
     }
 
     // TODO: Is this actually needed? I don't need root to run it on MacOS.
-    if !utils::is_root_user() {
+    if !arp_scan::is_root_user() {
         eprintln!("Should run this binary as root or use --help for options");
         process::exit(1);
     }
@@ -706,11 +698,11 @@ fn main() {
     };
 
     if matches!(output, OutputFormat::Plain) {
-        let (_, ip_networks) = compute_network_configuration(&interfaces, &scan_options);
+        let (_, ip_networks) = arp_scan::compute_network_configuration(&interfaces, &scan_options);
 
-        match utils::compute_network_size(&ip_networks) {
+        match arp_scan::compute_network_size(&ip_networks) {
             Ok(network_size) => {
-                let estimations = compute_scan_estimation(network_size, &scan_options);
+                let estimations = arp_scan::compute_scan_estimation(network_size, &scan_options);
                 let interval_ms = estimations.interval_ms;
 
                 let formatted_ms = time::format_milliseconds(estimations.duration_ms);
@@ -730,7 +722,7 @@ fn main() {
         }
     }
 
-    match scan::arp_scan(&scan_options) {
+    match arp_scan::arp_scan(&scan_options) {
         Ok(res) => {
             let response_summary = res.response_summary;
             let target_details = res.target_details;
