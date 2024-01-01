@@ -159,7 +159,6 @@ pub fn build_args() -> Command {
             Arg::new("oui-file")
                 .long("oui-file")
                 .value_name("FILE_PATH")
-                .default_value("/usr/share/arp-scan/ieee-oui.csv")
                 .help("Path to custom IEEE OUI CSV file for vendor lookup"),
         )
         .arg(
@@ -224,6 +223,8 @@ pub fn build_args() -> Command {
 }
 
 pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
+    let mut scan_options = arp_scan::ScanOptionsBuilder::new();
+
     let profile = match matches.get_one::<String>("profile") {
         Some(output_request) => match output_request.as_ref() {
             "default" | "d" => arp_scan::ProfileType::Default,
@@ -237,18 +238,24 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => arp_scan::ProfileType::Default,
     };
+    scan_options.profile(profile.clone());
 
-    let interface_name = matches.get_one::<String>("interface").cloned();
+    if let Some(interface_name) = matches.get_one::<String>("interface").cloned() {
+        scan_options.interface_name(interface_name);
+    }
 
     let file_option = matches.get_one::<String>("file");
     let network_option = matches.get_one::<String>("network");
 
-    let network_range = arp_scan::ScanOptions::compute_networks(file_option, network_option)
-        .unwrap_or_else(|err| {
+    if let Some(network_range) =
+        arp_scan::ScanOptions::compute_networks(file_option, network_option).unwrap_or_else(|err| {
             eprintln!("Could not compute requested network range to scan");
             eprintln!("{}", err);
             process::exit(1);
-        });
+        })
+    {
+        scan_options.network_range(network_range);
+    };
 
     let timeout_ms: u64 = match matches.get_one::<String>("timeout") {
         Some(timeout_text) => time::parse_to_milliseconds(timeout_text).unwrap_or_else(|err| {
@@ -260,10 +267,12 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
             _ => arp_scan::TIMEOUT_MS_DEFAULT,
         },
     };
+    scan_options.timeout_ms(timeout_ms);
 
     // Hostnames will not be resolved in numeric mode or stealth profile
     let resolve_hostname =
         !matches.get_flag("numeric") && !matches!(profile, arp_scan::ProfileType::Stealth);
+    scan_options.resolve_hostname(resolve_hostname);
 
     let source_ipv4: Option<Ipv4Addr> = match matches.get_one::<String>("source_ip") {
         Some(source_ip) => match source_ip.parse::<Ipv4Addr>() {
@@ -275,6 +284,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.source_ipv4(source_ipv4);
 
     let destination_mac: Option<MacAddr> = match matches.get_one::<String>("destination_mac") {
         Some(mac_address) => match mac_address.parse::<MacAddr>() {
@@ -286,6 +296,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.destination_mac(destination_mac);
 
     let source_mac: Option<MacAddr> = match matches.get_one::<String>("source_mac") {
         Some(mac_address) => match mac_address.parse::<MacAddr>() {
@@ -297,6 +308,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.source_mac(source_mac);
 
     let vlan_id: Option<u16> = match matches.get_one::<String>("vlan") {
         Some(vlan) => match vlan.parse::<u16>() {
@@ -308,6 +320,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.vlan_id(vlan_id);
 
     let retry_count = match matches.get_one::<String>("retry_count") {
         Some(retry_count) => match retry_count.parse::<usize>() {
@@ -322,6 +335,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
             _ => arp_scan::HOST_RETRY_DEFAULT,
         },
     };
+    scan_options.retry_count(retry_count);
 
     let bandwidth = match matches.get_one::<String>("bandwidth") {
         Some(bandwidth) => match bandwidth.parse::<u64>() {
@@ -333,6 +347,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.bandwidth(bandwidth);
 
     let interval = match matches.get_one::<String>("interval") {
         Some(interval) => match interval.parse::<u64>() {
@@ -344,20 +359,25 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.interval(interval);
 
     let scan_timing: arp_scan::ScanTiming =
         arp_scan::ScanOptions::compute_scan_timing(bandwidth, interval, &profile);
+    scan_options.scan_timing(scan_timing);
 
     let randomize_targets = matches.get_flag("random")
         || matches!(
             profile,
             arp_scan::ProfileType::Stealth | arp_scan::ProfileType::Chaos
         );
+    scan_options.randomize_targets(randomize_targets);
 
     let oui_file: String = match matches.get_one::<String>("oui-file") {
         Some(file) => file.to_string(),
-        None => "/usr/share/arp-scan/ieee-oui.csv".to_string(),
+        None => arp_scan::get_oui_file(),
     };
+    println!("OUI: {}", oui_file);
+    scan_options.oui_file(oui_file);
 
     let hw_type = match matches.get_one::<String>("hw_type") {
         Some(hw_type_text) => match hw_type_text.parse::<u16>() {
@@ -369,6 +389,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.hw_type(hw_type);
 
     let hw_addr = match matches.get_one::<String>("hw_addr") {
         Some(hw_addr_text) => match hw_addr_text.parse::<u8>() {
@@ -380,6 +401,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.hw_addr(hw_addr);
 
     let proto_type = match matches.get_one::<String>("proto_type") {
         Some(proto_type_text) => match proto_type_text.parse::<u16>() {
@@ -391,6 +413,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.proto_type(proto_type);
 
     let proto_addr = match matches.get_one::<String>("proto_addr") {
         Some(proto_addr_text) => match proto_addr_text.parse::<u8>() {
@@ -402,6 +425,7 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.proto_addr(proto_addr);
 
     let arp_operation = match matches.get_one::<String>("arp_operation") {
         Some(arp_op_text) => match arp_op_text.parse::<u16>() {
@@ -413,31 +437,9 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         },
         None => None,
     };
+    scan_options.arp_operation(arp_operation);
 
-    Arc::new(arp_scan::ScanOptions {
-        profile,
-        interface_name,
-        network_range,
-        timeout_ms,
-        resolve_hostname,
-        source_ipv4,
-        destination_mac,
-        source_mac,
-        vlan_id,
-        retry_count,
-        scan_timing,
-        randomize_targets,
-        // output,
-        oui_file,
-        hw_type,
-        hw_addr,
-        proto_type,
-        proto_addr,
-        arp_operation,
-        // packet_help,
-        bandwidth,
-        interval,
-    })
+    Arc::new(scan_options.build().unwrap())
 }
 
 /**

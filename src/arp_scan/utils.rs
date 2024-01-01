@@ -3,6 +3,10 @@ use std::env;
 use ipnetwork::{IpNetwork, NetworkSize};
 use pnet_datalink::NetworkInterface;
 
+pub fn get_oui_file() -> String {
+    ieee_registry::get_oui_path().unwrap()
+}
+
 /**
  * Based on the current UNIX environment, find if the process is run as root
  * user. This approach only supports Linux-like systems (Ubuntu, Fedore, MacOS, ...).

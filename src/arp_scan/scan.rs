@@ -127,15 +127,11 @@ pub fn arp_scan(scan_options: &Arc<ScanOptions>) -> Result<ScanResults, Error> {
     timed_out.store(true, Ordering::Relaxed);
 
     match arp_responses.join() {
-        Ok(r) => {
-            Ok(ScanResults {
-                response_summary: r.0,
-                target_details: r.1,
-            })
-        }
-        Err(_) => {
-            Err(Error::new(ErrorKind::Other, ""))
-        }
+        Ok(r) => Ok(ScanResults {
+            response_summary: r.0,
+            target_details: r.1,
+        }),
+        Err(_) => Err(Error::new(ErrorKind::Other, "")),
     }
 
     // let (response_summary, target_details) = arp_responses.join().unwrap_or_else(|error| {
