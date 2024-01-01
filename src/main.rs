@@ -376,7 +376,6 @@ pub fn parse_clap_args(matches: &ArgMatches) -> Arc<arp_scan::ScanOptions> {
         Some(file) => file.to_string(),
         None => arp_scan::get_oui_file(),
     };
-    println!("OUI: {}", oui_file);
     scan_options.oui_file(oui_file);
 
     let hw_type = match matches.get_one::<String>("hw_type") {
